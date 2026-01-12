@@ -157,7 +157,7 @@ const App: React.FC = () => {
                    Public Domain Clipper is live: open-source, free, and hostable by anyone. Grab public-domain images, isolate subjects, build archives for all.
                  </p>
                  <a 
-                   href="https://github.com" 
+                   href="https://github.com/jbrick2070/Public-Domain-Clipper" 
                    target="_blank" 
                    rel="noopener noreferrer"
                    className="inline-flex items-center gap-2 bg-gray-900 text-white px-3 py-1.5 rounded-full hover:bg-gray-700 transition-colors mx-auto"

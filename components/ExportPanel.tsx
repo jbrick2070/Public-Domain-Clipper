@@ -150,9 +150,6 @@ const ExportPanel: React.FC<Props> = ({ results, allLoaded, onUpdateImage }) => 
             const baseFileName = `${(i + 1).toString().padStart(2, '0')}_${safeTitle}`;
             
             topicFolder?.file(`${baseFileName}.${fileExt}`, blob);
-            
-            const metadataContent = `Source: ${img.source}\nSubject: ${res.topic.name}\nTitle: ${img.title}\nLicense: ${img.license}\nAttribution: ${img.attribution}\nAI Cleaned: ${isProcessed ? 'Yes' : 'No'}\nOriginal URL: ${img.url}`;
-            topicFolder?.file(`${baseFileName}.${fileExt}.txt`, metadataContent);
           } catch (e) {
             addLog(`WRITE ERROR: ${img.title.substring(0, 15)}`, 'warn');
           }
@@ -217,7 +214,6 @@ const ExportPanel: React.FC<Props> = ({ results, allLoaded, onUpdateImage }) => 
             const baseFileName = `${(i + 1).toString().padStart(2, '0')}_${safeTitle}`;
             
             topicFolder?.file(`${baseFileName}.${fileExt}`, blob);
-            topicFolder?.file(`${baseFileName}.${fileExt}.txt`, `Source: ${img.source}\nAttribution: ${img.attribution}\nLicense: ${img.license}`);
           } catch(e) {}
           
           processedCount++;
