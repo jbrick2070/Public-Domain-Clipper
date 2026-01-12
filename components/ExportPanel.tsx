@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { TopicResult, ImageMetadata } from '../types';
 import { FolderDown, FileArchive, Loader2, Wand2, CheckSquare, Square, Terminal, Wifi, Activity, ArrowRight, Play, Scissors, Image as ImageIcon } from 'lucide-react';
@@ -75,6 +74,21 @@ const ExportPanel: React.FC<Props> = ({ results, allLoaded, onUpdateImage }) => 
     return `${baseName}_${suffix}.zip`;
   };
 
+  // Helper to fetch with simple retry
+  const fetchWithRetry = async (url: string, attempts = 2): Promise<Blob> => {
+    for (let i = 0; i < attempts; i++) {
+        try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return await res.blob();
+        } catch (e) {
+            if (i === attempts - 1) throw e;
+            await new Promise(r => setTimeout(r, 1000));
+        }
+    }
+    throw new Error("Failed after retries");
+  };
+
   const runBulkAiAndDownload = async () => {
     if (zipping) return;
     const activeResults = getSelectedResults();
@@ -88,10 +102,19 @@ const ExportPanel: React.FC<Props> = ({ results, allLoaded, onUpdateImage }) => 
     setLogs([]); // Clear previous logs
     addLog("Initializing Bulk Export Sequence...", 'info');
     
+    // Use a local map to track processed URLs to avoid closure staleness issues
+    const processedMap = new Map<string, string>(); // Key: `${topicId}::${imgUrl}`
+
+    const getKey = (topicId: string, url: string) => `${topicId}::${url}`;
+
     const allImages: { topicId: string, img: ImageMetadata, topicName: string }[] = [];
     activeResults.forEach(res => {
       res.images.forEach(img => {
         allImages.push({ topicId: res.topic.id, img, topicName: res.topic.name });
+        // Pre-fill map if already processed
+        if (img.processedUrl) {
+            processedMap.set(getKey(res.topic.id, img.url), img.processedUrl);
+        }
       });
     });
 
@@ -108,13 +131,23 @@ const ExportPanel: React.FC<Props> = ({ results, allLoaded, onUpdateImage }) => 
       addLog("--- PHASE 1: AI EXTRACTION ---", 'info');
       for (let i = 0; i < allImages.length; i++) {
         const { topicId, img, topicName } = allImages[i];
+        const key = getKey(topicId, img.url);
         
-        if (!img.processedUrl) {
+        // Check local map first
+        if (!processedMap.has(key)) {
           addLog(`CONNECT: Gemini 2.5 -> '${img.title.substring(0, 15)}...'`, 'info');
           try {
             onUpdateImage(topicId, img.title, { processing: true });
+            
+            // Execute AI (Service now has built-in retries)
             const processedUrl = await removeBackground(img.url);
+            
+            // Update Global State (UI)
             onUpdateImage(topicId, img.title, { processedUrl, processing: false });
+            
+            // Update Local Map (For Zip)
+            processedMap.set(key, processedUrl);
+            
             addLog(`SUCCESS: Extracted '${img.title.substring(0, 15)}...'`, 'success');
           } catch (err) {
             addLog(`ERROR: AI failed for '${img.title.substring(0, 15)}...'`, 'warn');
@@ -138,20 +171,29 @@ const ExportPanel: React.FC<Props> = ({ results, allLoaded, onUpdateImage }) => 
         
         for (let i = 0; i < res.images.length; i++) {
           const img = res.images[i];
-          const finalUrl = img.processedUrl || img.url;
+          const key = getKey(res.topic.id, img.url);
+          
+          // CRITICAL: Retrieve from local map first to ensure we get the newly processed URL
+          const processedUrl = processedMap.get(key);
+          const finalUrl = processedUrl || img.url;
           
           try {
-            const response = await fetch(finalUrl);
-            const blob = await response.blob();
+            const blob = await fetchWithRetry(finalUrl);
             
-            const isProcessed = !!img.processedUrl;
+            const isProcessed = !!processedUrl;
+            // Use PNG for processed images (transparency), preserve original extension otherwise
             const fileExt = isProcessed ? 'png' : (img.url.split('.').pop() || 'jpg');
             const safeTitle = img.title.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
             const baseFileName = `${(i + 1).toString().padStart(2, '0')}_${safeTitle}`;
             
             topicFolder?.file(`${baseFileName}.${fileExt}`, blob);
           } catch (e) {
-            addLog(`WRITE ERROR: ${img.title.substring(0, 15)}`, 'warn');
+             const isOriginal = !processedUrl;
+             if (isOriginal) {
+                addLog(`CORS BLOCKED: ${img.title.substring(0, 15)} (Source blocked download)`, 'warn');
+             } else {
+                addLog(`WRITE ERROR: ${img.title.substring(0, 15)}`, 'warn');
+             }
           }
           
           zipProcessed++;
@@ -206,15 +248,16 @@ const ExportPanel: React.FC<Props> = ({ results, allLoaded, onUpdateImage }) => 
         for (let i = 0; i < res.images.length; i++) {
           const img = res.images[i];
           try {
-            const response = await fetch(img.url);
-            const blob = await response.blob();
+            const blob = await fetchWithRetry(img.url);
             
             const fileExt = img.url.split('.').pop() || 'jpg';
             const safeTitle = img.title.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
             const baseFileName = `${(i + 1).toString().padStart(2, '0')}_${safeTitle}`;
             
             topicFolder?.file(`${baseFileName}.${fileExt}`, blob);
-          } catch(e) {}
+          } catch(e) {
+             addLog(`CORS SKIP: ${img.title.substring(0, 10)}...`, 'warn');
+          }
           
           processedCount++;
           setZipProgress(Math.floor((processedCount / totalToProcess) * 100));

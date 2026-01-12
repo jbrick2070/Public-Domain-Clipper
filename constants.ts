@@ -1,5 +1,5 @@
 
-import { Cultivar } from './types';
+import { Cultivar, DataSource } from './types';
 
 export const BANANA_CULTIVARS: Cultivar[] = [
   { id: '01', name: 'Musa acuminata', category: 'Category:Musa_acuminata_cultivars', order: 1, description: 'Wild ancestor (A genome)' },
@@ -14,6 +14,29 @@ export const BANANA_CULTIVARS: Cultivar[] = [
   { id: '10', name: 'Cardava', category: 'Category:Cardava_banana', order: 10, description: 'Similar to Saba, robust triploid.' },
   { id: '11', name: 'Red Banana', category: 'Category:Red_bananas', order: 11, description: 'Distinctive color and creamy texture.' },
   { id: '12', name: 'Blue Java', category: 'Category:Blue_Java_banana', order: 12, description: 'Ice cream banana with vanilla-like flavor.' }
+];
+
+export const ALL_SOURCES: DataSource[] = [
+  'Wikimedia',
+  'Cleveland Museum of Art',
+  'NASA',
+  'The Met',
+  'Art Institute of Chicago',
+  'Library of Congress',
+  'Internet Archive'
+];
+
+// Sources enabled by default (General purpose, less "artsy", no space specifics)
+export const DEFAULT_SOURCES: DataSource[] = [
+  'Wikimedia',
+  'Library of Congress',
+  'Internet Archive'
+];
+
+export const MUSEUM_SOURCES: DataSource[] = [
+  'The Met',
+  'Art Institute of Chicago',
+  'Cleveland Museum of Art'
 ];
 
 export const WIKIMEDIA_API = "https://commons.wikimedia.org/w/api.php";

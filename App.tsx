@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { TopicResult, ImageMetadata } from './types';
+import { TopicResult, ImageMetadata, DataSource } from './types';
 import { getTopicImages } from './services/wikimediaService';
+import { ALL_SOURCES, DEFAULT_SOURCES } from './constants';
 import CultivarCard from './components/CultivarCard';
 import ExportPanel from './components/ExportPanel';
 import Header from './components/Header';
@@ -19,10 +20,11 @@ const App: React.FC = () => {
 
   // Load the initial demo topic on mount
   useEffect(() => {
-    handleSearch('Bananas', 'demo-1');
+    // Use DEFAULT_SOURCES to keep the initial view clean
+    handleSearch('Bananas', DEFAULT_SOURCES, 3, 'demo-1');
   }, []);
 
-  const handleSearch = async (term: string, existingId?: string) => {
+  const handleSearch = async (term: string, sources: DataSource[], limit: number, existingId?: string) => {
     const id = existingId || Date.now().toString();
     
     if (!existingId) {
@@ -38,7 +40,7 @@ const App: React.FC = () => {
     }
 
     try {
-      const images = await getTopicImages(term);
+      const images = await getTopicImages(term, sources, limit);
       setResults(prev => prev.map(r => 
         r.topic.id === id 
           ? { ...r, images, status: 'success' as const } 
@@ -77,7 +79,7 @@ const App: React.FC = () => {
     <div className="h-screen flex flex-col bg-[#f8fafc] overflow-hidden">
       {/* Fixed Header */}
       <div className="flex-none">
-        <Header onSearch={(term) => handleSearch(term)} />
+        <Header onSearch={(term, sources, limit) => handleSearch(term, sources, limit)} />
       </div>
       
       {/* Main Dashboard Area */}
@@ -149,7 +151,7 @@ const App: React.FC = () => {
            <div className="flex-none p-4 border-t border-gray-100 bg-gray-50 text-[10px] text-gray-500 space-y-3">
               
               <div className="flex justify-center gap-3 opacity-60">
-                <span>Wiki</span> &bull; <span>LOC</span> &bull; <span>IA</span> &bull; <span>Met</span> &bull; <span>AIC</span>
+                <span>Wiki</span> &bull; <span>LOC</span> &bull; <span>IA</span> &bull; <span>Met</span> &bull; <span>AIC</span> &bull; <span>CMA</span>
               </div>
               
               <div className="text-center space-y-2">

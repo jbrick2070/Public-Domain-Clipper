@@ -1,7 +1,8 @@
 
-import { WIKIMEDIA_API } from '../constants';
-import { ImageMetadata } from '../types';
+import { WIKIMEDIA_API, ALL_SOURCES } from '../constants';
+import { ImageMetadata, DataSource } from '../types';
 import { fetchMetImages, fetchAICImages } from './museumService';
+import { fetchClevelandImages, fetchNasaImages } from './otherSourcesService';
 import { GoogleGenAI } from "@google/genai";
 
 // Initialize AI client for query optimization
@@ -11,7 +12,7 @@ const getAiClient = () => new GoogleGenAI({ apiKey: process.env.API_KEY || '' })
  * AI-POWERED QUERY OPTIMIZER
  * Expands a simple user term into specific archival search queries.
  */
-const generateSmartQueries = async (topic: string): Promise<{ wiki: string, archive: string, museum: string }> => {
+const generateSmartQueries = async (topic: string): Promise<{ wiki: string, archive: string, museum: string, space: string }> => {
   try {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
@@ -22,13 +23,14 @@ const generateSmartQueries = async (topic: string): Promise<{ wiki: string, arch
       contents: {
         parts: [{
           text: `You are an expert visual archivist. The user is searching for "${topic}". 
-          Generate 3 distinct, highly effective search phrases to find PUBLIC DOMAIN images suitable for collage/cutting out (isolated subjects, clear illustrations).
+          Generate 4 distinct search phrases to find PUBLIC DOMAIN images.
           
-          1. "wiki": For Wikimedia Commons. Use scientific names if biological, or specific distinct terms. (e.g. "Musa acuminata" instead of "Banana").
-          2. "archive": For Library of Congress/Internet Archive. Use historical terms, "engraving", "lithograph", "plate", or "vintage photograph".
-          3. "museum": For Art Museums. Use "study", "drawing", "watercolor", "oil sketch", or specific art movements.
+          1. "wiki": For Wikimedia Commons (scientific names, specific locations).
+          2. "archive": For Libraries/Archives (historical terms, "engraving", "plate").
+          3. "museum": For Art Museums (artistic terms, "sketch", "oil", "study").
+          4. "space": For NASA (scientific terms, celestial bodies, mission names).
           
-          Return JSON: { "wiki": "string", "archive": "string", "museum": "string" }`
+          Return JSON: { "wiki": "string", "archive": "string", "museum": "string", "space": "string" }`
         }]
       }
     });
@@ -36,17 +38,17 @@ const generateSmartQueries = async (topic: string): Promise<{ wiki: string, arch
     const text = response.text;
     if (text) {
       const json = JSON.parse(text);
-      // Fallback if keys are missing
       return {
         wiki: json.wiki || topic,
         archive: json.archive || topic,
-        museum: json.museum || topic
+        museum: json.museum || topic,
+        space: json.space || topic
       };
     }
     throw new Error("No text returned from AI");
   } catch (e) {
     console.warn("Smart Query failed, using raw term:", e);
-    return { wiki: topic, archive: topic, museum: topic };
+    return { wiki: topic, archive: topic, museum: topic, space: topic };
   }
 };
 
@@ -152,9 +154,8 @@ export const fetchIAImages = async (query: string, limit: number = 2): Promise<I
 
 /**
  * AGGREGATED DISCOVERY
- * Now enhanced with AI Query Generation
  */
-export const getTopicImages = async (topicName: string): Promise<ImageMetadata[]> => {
+export const getTopicImages = async (topicName: string, enabledSources: DataSource[] = ALL_SOURCES, limitPerSource: number = 2): Promise<ImageMetadata[]> => {
   
   // 1. Ask Gemini for better search terms for each specific archive type
   const smartQueries = await generateSmartQueries(topicName);
@@ -162,25 +163,54 @@ export const getTopicImages = async (topicName: string): Promise<ImageMetadata[]
   console.log(`Smart Search for "${topicName}":`, smartQueries);
 
   // 2. Parallel fetch using the specialized queries
-  const [wiki, loc, ia, met, aic] = await Promise.all([
-    fetchWikimediaImages(smartQueries.wiki, 4),
-    fetchLOCImages(smartQueries.archive, 2),
-    fetchIAImages(smartQueries.archive, 2),
-    fetchMetImages(smartQueries.museum, 2),
-    fetchAICImages(smartQueries.museum, 2)
-  ]);
+  const promises = [];
+  
+  if (enabledSources.includes('Wikimedia')) {
+    promises.push(fetchWikimediaImages(smartQueries.wiki, limitPerSource + 1)); // Fetch slightly more from wiki as backup
+  } else { promises.push(Promise.resolve([])); }
 
-  // 3. Interleave results
+  if (enabledSources.includes('Library of Congress')) {
+    promises.push(fetchLOCImages(smartQueries.archive, limitPerSource));
+  } else { promises.push(Promise.resolve([])); }
+
+  if (enabledSources.includes('Internet Archive')) {
+    promises.push(fetchIAImages(smartQueries.archive, limitPerSource));
+  } else { promises.push(Promise.resolve([])); }
+
+  if (enabledSources.includes('The Met')) {
+    promises.push(fetchMetImages(smartQueries.museum, limitPerSource));
+  } else { promises.push(Promise.resolve([])); }
+
+  if (enabledSources.includes('Art Institute of Chicago')) {
+    promises.push(fetchAICImages(smartQueries.museum, limitPerSource));
+  } else { promises.push(Promise.resolve([])); }
+
+  if (enabledSources.includes('Cleveland Museum of Art')) {
+    promises.push(fetchClevelandImages(smartQueries.museum, limitPerSource));
+  } else { promises.push(Promise.resolve([])); }
+
+  if (enabledSources.includes('NASA')) {
+    promises.push(fetchNasaImages(smartQueries.space, limitPerSource));
+  } else { promises.push(Promise.resolve([])); }
+
+  const [wiki, loc, ia, met, aic, cma, nasa] = await Promise.all(promises);
+
+  // 3. Interleave results for variety
   const result = [];
-  const maxLength = Math.max(wiki.length, loc.length, ia.length, met.length, aic.length);
+  const maxLength = Math.max(
+      wiki.length, loc.length, ia.length, met.length, aic.length, cma.length, nasa.length
+  );
   
   for (let i = 0; i < maxLength; i++) {
     if (wiki[i]) result.push(wiki[i]);
+    if (cma[i]) result.push(cma[i]);
     if (met[i]) result.push(met[i]);
+    if (nasa[i]) result.push(nasa[i]);
     if (aic[i]) result.push(aic[i]);
     if (loc[i]) result.push(loc[i]);
     if (ia[i]) result.push(ia[i]);
   }
 
-  return result.slice(0, 12);
+  // Hard limit total results to prevent crashing the UI with too many images if user selects max everywhere
+  return result.slice(0, 50); 
 };

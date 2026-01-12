@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { TopicResult, ImageMetadata } from '../types';
-import { Loader2, ExternalLink, Download, Sparkles, RefreshCw, Library, Globe, FileText, Trash2, Landmark, Palette } from 'lucide-react';
+import { Loader2, ExternalLink, Download, Sparkles, RefreshCw, Library, Globe, FileText, Trash2, Landmark, Palette, Rocket, Building2 } from 'lucide-react';
 import { removeBackground } from '../services/aiService';
 
 interface Props {
@@ -16,12 +16,14 @@ const SourceBadge: React.FC<{ source: ImageMetadata['source'] }> = ({ source }) 
     'Internet Archive': { color: 'bg-amber-100 text-amber-700', icon: FileText, label: 'IA' },
     'Library of Congress': { color: 'bg-gray-100 text-gray-700', icon: Library, label: 'LOC' },
     'The Met': { color: 'bg-rose-100 text-rose-800', icon: Landmark, label: 'MET' },
-    'Art Institute of Chicago': { color: 'bg-stone-100 text-stone-700', icon: Palette, label: 'AIC' }
+    'Art Institute of Chicago': { color: 'bg-stone-100 text-stone-700', icon: Palette, label: 'AIC' },
+    'Cleveland Museum of Art': { color: 'bg-emerald-100 text-emerald-700', icon: Building2, label: 'CMA' },
+    'NASA': { color: 'bg-indigo-900 text-white border-none', icon: Rocket, label: 'NASA' }
   }[source];
 
   const Icon = config?.icon || Globe;
   return (
-    <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black ${config?.color || 'bg-gray-100'} border border-current opacity-90`}>
+    <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black ${config?.color || 'bg-gray-100'} border border-current opacity-90 shadow-sm`}>
       <Icon className="w-2 h-2" />
       {config?.label || 'WEB'}
     </div>
@@ -73,7 +75,7 @@ const CultivarCard: React.FC<Props> = ({ result, onUpdateImage, onRemove }) => {
           </div>
         ) : (
           <div className="grid grid-cols-2 bg-gray-200 gap-px">
-            {images.slice(0, 4).map((img, idx) => (
+            {images.slice(0, 6).map((img, idx) => (
               <div key={idx} className="relative aspect-square group/img bg-white overflow-hidden">
                 <div className="absolute inset-0 bg-gray-100 animate-pulse" />
                 <img 

@@ -1,4 +1,6 @@
 
+export type DataSource = 'Wikimedia' | 'Internet Archive' | 'Library of Congress' | 'The Met' | 'Art Institute of Chicago' | 'Cleveland Museum of Art' | 'NASA';
+
 export interface Cultivar {
   id: string;
   name: string;
@@ -20,7 +22,7 @@ export interface ImageMetadata {
   license: string;
   attribution: string;
   thumbUrl: string;
-  source: 'Wikimedia' | 'Internet Archive' | 'Library of Congress' | 'The Met' | 'Art Institute of Chicago';
+  source: DataSource;
   processedUrl?: string; 
   processing?: boolean;  
 }
